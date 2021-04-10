@@ -1,5 +1,7 @@
 import os
 import sys
+import time
+
 import pygame
 import random
 
@@ -48,6 +50,7 @@ def terminate():
 # Фуннкция начального экрана
 def start_screen():
     global level
+    level = 1
 
     # Заголовок тетрис:
     title = pygame.sprite.Sprite(sprites)
@@ -69,12 +72,15 @@ def start_screen():
                     game.state = 'start'
                     game.__init__(20, 10)
                     return  # Выходим из функции
+
                 if event.key == pygame.K_UP:  # Повышение уровня (1 - 5)
-                    if level < 5:
-                        level += 1
+                    if game.state != 'start':
+                        if level < 5:
+                            level += 1
                 if event.key == pygame.K_DOWN:  # Понижение уровня (5 - 1)
-                    if level > 1:
-                        level -= 1
+                    if game.state != 'start':
+                        if level > 1:
+                            level -= 1
             if event.type == pygame.MOUSEMOTION:  # Для отображения курсора при перемещении
                 x, y = event.pos
                 cursor.rect.x, cursor.rect.y = x, y
@@ -103,6 +109,7 @@ def start_screen():
             x_text = -400
 
         # Правила
+        rules_text6 = font3.render('5) To break line - answer the question', True, WHITE)
         rules_text1 = font.render('Game rules:', True, WHITE)
         rules_text2 = font3.render('1) To lower the figure - press |down arrow|', True, WHITE)
         rules_text3 = font3.render('2) To flip the figure - press |up arrow|', True, WHITE)
@@ -114,6 +121,7 @@ def start_screen():
         screen.blit(rules_text3, [20, 380])
         screen.blit(rules_text4, [20, 405])
         screen.blit(rules_text5, [20, 430])
+        screen.blit(rules_text6, [20, 455])
 
         pygame.display.flip()
         clock.tick(fps)
@@ -216,6 +224,7 @@ class Tetris:
     y = 60
     zoom = 20
     figure = None
+    was = []
 
     def __init__(self, height, width):
         self.height = height
@@ -244,18 +253,99 @@ class Tetris:
                         intersection = True
         return intersection
 
+    def quiz(self):
+        number = str(random.randint(1, 20))
+        print(number)
+        result = False
+        sprites_answer = pygame.sprite.Group()
+        main_image = pygame.sprite.Sprite(sprites_answer)
+        main_image.image = load_image(f'questions/{number}.jpg')
+        main_image.image = pygame.transform.scale(main_image.image, (400, 300))
+        main_image.rect = main_image.image.get_rect()
+        main_image.rect.x = 0
+        main_image.rect.y = 0
+        positions = [[0, 300], [200, 300], [100, 400]]
+        image1 = pygame.sprite.Sprite(sprites_answer)
+        image1.image = load_image(f'questions/{number}_1.jpg')
+        image1.image = pygame.transform.scale(image1.image, (200, 100))
+        image1.rect = image1.image.get_rect()
+        image2 = pygame.sprite.Sprite(sprites_answer)
+        image2.image = load_image(f'questions/{number}_2.jpg')
+        image2.image = pygame.transform.scale(image2.image, (200, 100))
+        image2.rect = image2.image.get_rect()
+        imager = pygame.sprite.Sprite(sprites_answer)
+        imager.image = load_image(f'questions/{number}_r.jpg')
+        imager.image = pygame.transform.scale(imager.image, (200, 100))
+        imager.rect = imager.image.get_rect()
+        answers = [image1, image2, imager]
+        random.shuffle(answers)
+        right = None
+        i = 0
+        for j in range(len(answers)):
+            answers[j].rect.x = positions[i][0]
+            answers[j].rect.y = positions[i][1]
+            i += 1
+            if answers[j] == imager:
+                right = j + 1
+                print(right)
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    break
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1:
+                        screen.fill('black')
+                        if right == 1:
+                            return True
+                        else:
+                            return False
+                    if event.key == pygame.K_2:
+                        screen.fill('black')
+                        if right == 2:
+                            return True
+                        else:
+                            return False
+                    if event.key == pygame.K_3:
+                        screen.fill('black')
+                        if right == 3:
+                            return True
+                        else:
+                            return False
+            screen.fill(BLACK)
+            sprites_answer.draw(screen)
+            pygame.display.flip()
+            clock.tick(fps)
+        return False
+
     def break_lines(self):
         lines = 0
+        delete = []
         for i in range(1, self.height):
+            if i in self.was:
+                continue
             zeros = 0
             for j in range(self.width):
                 if self.field[i][j] == 0:
                     zeros += 1
             if zeros == 0:
-                lines += 1
-                for i1 in range(i, 1, -1):
-                    for j in range(self.width):
-                        self.field[i1][j] = self.field[i1 - 1][j]
+                delete.append(i)
+                self.was.append(i)
+        if bool(delete):
+            r = self.quiz()
+            self.state = 'quiz'
+            print(r)
+            if r:
+                for i in delete:
+                    lines += 1
+                    for i1 in range(i, 1, -1):
+                        for j in range(self.width):
+                            self.field[i1][j] = self.field[i1 - 1][j]
+                for i in self.was:
+                    lines += 1
+                    for i1 in range(i, 1, -1):
+                        for j in range(self.width):
+                            self.field[i1][j] = self.field[i1 - 1][j]
+                self.was = []
         self.score += lines ** 2
 
     def go_space(self):
@@ -321,6 +411,11 @@ while running:
     counter += 1
     if counter > 100000:
         counter = 0
+
+    if game.state == 'quiz':
+        time.sleep(2)
+        game.state = 'start'
+        pressing_down = False
 
     if counter % (fps // level // 2) == 0 or pressing_down:
         if game.state == "start":
